@@ -854,7 +854,7 @@ namespace Microsoft.AspNetCore.Identity
         /// </summary>
         /// <param name="user">The user whose password should be reset.</param>
         /// <param name="token">The password reset token to verify.</param>
-        /// <param name="newPassword">The new password to set if reset token verification fails.</param>
+        /// <param name="newPassword">The new password to set if reset token verification succeeds.</param>
         /// <returns>
         /// The <see cref="Task"/> that represents the asynchronous operation, containing the <see cref="IdentityResult"/>
         /// of the operation.
@@ -1579,12 +1579,10 @@ namespace Microsoft.AspNetCore.Identity
         /// <returns>
         /// The <see cref="Task"/> that represents the asynchronous operation, containing the telephone change number token.
         /// </returns>
-        public virtual async Task<string> GenerateChangePhoneNumberTokenAsync(TUser user, string phoneNumber)
+        public virtual Task<string> GenerateChangePhoneNumberTokenAsync(TUser user, string phoneNumber)
         {
             ThrowIfDisposed();
-            return Rfc6238AuthenticationService.GenerateCode(
-                await CreateSecurityTokenAsync(user), phoneNumber)
-                    .ToString(CultureInfo.InvariantCulture);
+            return GenerateUserTokenAsync(user, Options.Tokens.ChangePhoneNumberTokenProvider, ChangePhoneNumberTokenPurpose + ":" + phoneNumber);
         }
 
         /// <summary>
@@ -1598,21 +1596,16 @@ namespace Microsoft.AspNetCore.Identity
         /// The <see cref="Task"/> that represents the asynchronous operation, returning true if the <paramref name="token"/>
         /// is valid, otherwise false.
         /// </returns>
-        public virtual async Task<bool> VerifyChangePhoneNumberTokenAsync(TUser user, string token, string phoneNumber)
+        public virtual Task<bool> VerifyChangePhoneNumberTokenAsync(TUser user, string token, string phoneNumber)
         {
             ThrowIfDisposed();
-
-            var securityToken = await CreateSecurityTokenAsync(user);
-            int code;
-            if (securityToken != null && Int32.TryParse(token, out code))
+            if (user == null)
             {
-                if (Rfc6238AuthenticationService.ValidateCode(securityToken, code, phoneNumber))
-                {
-                    return true;
-                }
+                throw new ArgumentNullException(nameof(user));
             }
-            Logger.LogWarning(8, "VerifyChangePhoneNumberTokenAsync() failed for user {userId}.", await GetUserIdAsync(user));
-            return false;
+
+            // Make sure the token is valid and the stamp matches
+            return VerifyUserTokenAsync(user, Options.Tokens.ChangePhoneNumberTokenProvider, ChangePhoneNumberTokenPurpose+":"+ phoneNumber, token);
         }
 
         /// <summary>
